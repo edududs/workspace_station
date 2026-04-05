@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -22,7 +23,7 @@ class LocalProjectWorkspace(ProjectWorkspacePort):
         return sorted(
             name
             for name in self.list_project_names()
-            if (self.project_path(name) / "pyproject.toml").exists()
+            if self._is_workspace_member_candidate(name)
         )
 
     def project_path(self, name: str) -> Path:
@@ -60,3 +61,23 @@ class LocalProjectWorkspace(ProjectWorkspacePort):
         if candidate.name != name or name in {".", ".."}:
             msg = f"Invalid project name '{name}'."
             raise ValueError(msg)
+
+    def _is_workspace_member_candidate(self, name: str) -> bool:
+        pyproject_path = self.project_path(name) / "pyproject.toml"
+        if not pyproject_path.exists():
+            return False
+
+        return not _declares_nested_uv_workspace(pyproject_path)
+
+
+def _declares_nested_uv_workspace(pyproject_path: Path) -> bool:
+    payload = tomllib.loads(pyproject_path.read_text(encoding="utf-8"))
+    tool_section = payload.get("tool")
+    if not isinstance(tool_section, dict):
+        return False
+
+    uv_section = tool_section.get("uv")
+    if not isinstance(uv_section, dict):
+        return False
+
+    return isinstance(uv_section.get("workspace"), dict)
