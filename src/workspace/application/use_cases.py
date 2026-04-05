@@ -9,6 +9,7 @@ from workspace.application.ports import (
     ProjectCatalogPort,
     ProjectWorkspacePort,
     SecretKeyPort,
+    WorkspaceMembersPort,
     WorkspaceServicePort,
 )
 from workspace.domain.models import ManagedRepository, ProjectDefinition
@@ -35,6 +36,7 @@ class WorkspaceService(WorkspaceServicePort):
     catalog: ProjectCatalogPort
     git_client: GitClientPort
     workspace: ProjectWorkspacePort
+    workspace_members: WorkspaceMembersPort
     secret_key_store: SecretKeyPort
 
     def list_repositories(self) -> list[ManagedRepository]:
@@ -78,6 +80,7 @@ class WorkspaceService(WorkspaceServicePort):
             ssh_key_path=ssh_key_path,
         )
         self.catalog.upsert_project(project)
+        self.sync_workspace_members()
 
         return ManagedRepository(
             name=project.name,
@@ -97,6 +100,12 @@ class WorkspaceService(WorkspaceServicePort):
 
         if known_project is not None:
             self.catalog.delete_project(name)
+
+        self.sync_workspace_members()
+
+    def sync_workspace_members(self) -> tuple[str, ...]:
+        members = tuple(f"projects/{name}" for name in self.workspace.list_python_project_names())
+        return self.workspace_members.replace_members(members)
 
     def _resolve_target(self, target: str) -> ProjectDefinition:
         known_project = self.catalog.get_project(target)

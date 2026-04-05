@@ -20,12 +20,18 @@ class ProjectCatalogPort(Protocol):
 
 class GitClientPort(Protocol):
     def clone(
-        self, *, repository_url: str, destination: Path, ssh_key_path: Path | None
+        self,
+        *,
+        repository_url: str,
+        destination: Path,
+        ssh_key_path: Path | None,
     ) -> None: ...
 
 
 class ProjectWorkspacePort(Protocol):
     def list_project_names(self) -> list[str]: ...
+
+    def list_python_project_names(self) -> list[str]: ...
 
     def project_path(self, name: str) -> Path: ...
 
@@ -40,9 +46,19 @@ class SecretKeyPort(Protocol):
     def get_private_key_path(self) -> Path | None: ...
 
 
+class CommandRunnerPort(Protocol):
+    def run(self, command: tuple[str, ...]) -> None: ...
+
+
+class WorkspaceMembersPort(Protocol):
+    def replace_members(self, members: tuple[str, ...]) -> tuple[str, ...]: ...
+
+
 class WorkspaceServicePort(Protocol):
     def list_repositories(self) -> list[ManagedRepository]: ...
 
     def clone_repository(self, target: str, *, force: bool) -> ManagedRepository: ...
 
     def delete_repository(self, name: str) -> None: ...
+
+    def sync_workspace_members(self) -> tuple[str, ...]: ...
