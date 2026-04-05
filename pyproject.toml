@@ -1,0 +1,60 @@
+[project]
+name = "workspace"
+version = "0.1.0"
+description = "Workspace repository manager CLI"
+readme = "README.md"
+authors = [
+    { name = "Eduardo", email = "dudulj15@gmail.com" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "dulwich>=1.1.0",
+    "orjson>=3.11.8",
+    "rich>=14.3.0",
+    "typer>=0.12.5",
+]
+
+[project.scripts]
+cache_clean = "workspace.cache_clean:main"
+check = "workspace.check:main"
+wrkspc = "workspace:main"
+
+[dependency-groups]
+dev = [
+    "basedpyright>=1.39.0",
+    "pytest>=8.4.2",
+    "ruff>=0.15.9",
+]
+
+[tool.uv.workspace]
+members = ["projects/whatsapp_bot"]
+
+[tool.ruff]
+target-version = "py313"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    "ANN401",
+    "D101",
+    "D103",
+    "D104",
+    "D203",
+    "D213",
+    "FBT001",
+    "FBT003",
+    "PLC2701",
+    "PLC0415",
+    "PLR0913",
+    "CPY",
+    "DOC201",
+    "D100",
+    "D102",
+    "S603",
+    "S607",
+]
+
+[build-system]
+requires = ["uv_build>=0.11.3,<0.12.0"]
+build-backend = "uv_build"
