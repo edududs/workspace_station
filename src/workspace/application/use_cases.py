@@ -9,6 +9,7 @@ from workspace.application.ports import (
     ProjectCatalogPort,
     ProjectWorkspacePort,
     SecretKeyPort,
+    WorkspaceServicePort,
 )
 from workspace.domain.models import ManagedRepository, ProjectDefinition
 
@@ -30,7 +31,7 @@ class InvalidProjectTargetError(WorkspaceError):
 
 
 @dataclass(slots=True)
-class WorkspaceService:
+class WorkspaceService(WorkspaceServicePort):
     catalog: ProjectCatalogPort
     git_client: GitClientPort
     workspace: ProjectWorkspacePort
@@ -41,24 +42,32 @@ class WorkspaceService:
         discovered_names = set(self.workspace.list_project_names())
         all_names = sorted(configured.keys() | discovered_names)
 
-        return [
-            ManagedRepository(
-                name=name,
-                path=self.workspace.project_path(name),
-                exists=self.workspace.exists(name),
-                configured_url=(
-                    configured.get(name).url if name in configured else self.workspace.origin_url(name)
+        repositories: list[ManagedRepository] = []
+        for name in all_names:
+            configured_project = configured.get(name)
+            configured_url = (
+                configured_project.url
+                if configured_project is not None
+                else self.workspace.origin_url(name)
+            )
+            repositories.append(
+                ManagedRepository(
+                    name=name,
+                    path=self.workspace.project_path(name),
+                    exists=self.workspace.exists(name),
+                    configured_url=configured_url,
                 ),
             )
-            for name in all_names
-        ]
+
+        return repositories
 
     def clone_repository(self, target: str, *, force: bool) -> ManagedRepository:
         project = self._resolve_target(target)
         if self.workspace.exists(project.name):
             if not force:
+                msg = f"Project '{project.name}' already exists. Use --force to replace it."
                 raise ProjectAlreadyExistsError(
-                    f"Project '{project.name}' already exists. Use --force to replace it."
+                    msg,
                 )
             self.workspace.remove(project.name)
 
@@ -80,7 +89,8 @@ class WorkspaceService:
     def delete_repository(self, name: str) -> None:
         known_project = self.catalog.get_project(name)
         if not self.workspace.exists(name) and known_project is None:
-            raise ProjectNotFoundError(f"Project '{name}' was not found in projects.")
+            msg = f"Project '{name}' was not found in projects."
+            raise ProjectNotFoundError(msg)
 
         if self.workspace.exists(name):
             self.workspace.remove(name)
@@ -94,13 +104,15 @@ class WorkspaceService:
             return known_project
 
         if not _looks_like_repository_url(target):
-            raise ProjectNotFoundError(
+            msg = (
                 f"Target '{target}' is neither a configured project nor a supported repository URL."
             )
+            raise ProjectNotFoundError(msg)
 
         project_name = _project_name_from_url(target)
         if not project_name:
-            raise InvalidProjectTargetError(f"Could not infer a project name from '{target}'.")
+            msg = f"Could not infer a project name from '{target}'."
+            raise InvalidProjectTargetError(msg)
 
         return ProjectDefinition(name=project_name, url=target)
 
