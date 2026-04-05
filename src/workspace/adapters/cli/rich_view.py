@@ -1,14 +1,20 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 from rich.text import Text
 
-from workspace.domain.models import ManagedRepository
+BYTE_UNIT_BASE = 1024
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from workspace.application.cache_clean import CacheCleanSummary
+    from workspace.domain.models import ManagedRepository
 
 
 @dataclass(slots=True)
@@ -22,7 +28,7 @@ class RichCliView:
                 "Nenhum repositório configurado ou clonado ainda.",
                 title="workspace",
                 border_style="cyan",
-            )
+            ),
         )
 
     def print_repository_table(self, repositories: list[ManagedRepository]) -> None:
@@ -53,7 +59,7 @@ class RichCliView:
                 f"[bold green]{name}[/bold green]\n[path]{self._display_path(path)}[/path]",
                 title="Clone Complete",
                 border_style="green",
-            )
+            ),
         )
 
     def print_delete_success(self, name: str) -> None:
@@ -62,7 +68,38 @@ class RichCliView:
                 f"[bold red]{name}[/bold red] removido do workspace.",
                 title="Deleted",
                 border_style="red",
-            )
+            ),
+        )
+
+    def print_sync_success(self, members: tuple[str, ...]) -> None:
+        body = "\n".join(members) if members else "[dim]No Python workspace members found.[/dim]"
+        self.console.print(
+            Panel.fit(
+                body,
+                title="Workspace Members Synced",
+                border_style="cyan",
+            ),
+        )
+
+    def print_cache_clean_result(self, summary: CacheCleanSummary) -> None:
+        targets = ", ".join(self._display_path(path) for path in summary.targets)
+        body = "\n".join(
+            [
+                f"[bold]Targets:[/bold] {targets}",
+                f"[bold]Cache paths removed:[/bold] {len(summary.removed_paths)}",
+                f"[bold]Files removed:[/bold] {summary.removed_file_count}",
+                f"[bold]Size before:[/bold] {self._format_bytes(summary.size_before_bytes)}",
+                f"[bold]Size after:[/bold] {self._format_bytes(summary.size_after_bytes)}",
+            ],
+        )
+        if not summary.removed_paths:
+            body += "\n[dim]No cache paths found.[/dim]"
+        self.console.print(
+            Panel.fit(
+                body,
+                title="Cache Cleaned",
+                border_style="yellow",
+            ),
         )
 
     def print_cancelled(self) -> None:
@@ -88,3 +125,14 @@ class RichCliView:
             return str(path.relative_to(self.workspace_root))
         except ValueError:
             return str(path)
+
+    def _format_bytes(self, size: int) -> str:
+        units = ("B", "KiB", "MiB", "GiB")
+        value = float(size)
+        for unit in units:
+            if value < BYTE_UNIT_BASE or unit == units[-1]:
+                if unit == "B":
+                    return f"{int(value)} {unit}"
+                return f"{value:.1f} {unit}"
+            value /= BYTE_UNIT_BASE
+        return f"{int(size)} B"

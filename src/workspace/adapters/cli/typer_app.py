@@ -62,7 +62,7 @@ def delete_repository(
         confirmed = typer.confirm(f"Delete project '{name}' from the workspace?", default=False)
         if not confirmed:
             view.print_cancelled()
-            raise typer.Exit()
+            raise typer.Exit
 
     service = build_workspace_service()
     try:
@@ -71,6 +71,13 @@ def delete_repository(
         raise typer.Exit(code=_print_error(str(error))) from error
 
     view.print_delete_success(name)
+
+
+@app.command("sync")
+def sync_workspace() -> None:
+    service = build_workspace_service()
+    members = service.sync_workspace_members()
+    view.print_sync_success(members)
 
 
 def _print_error(message: str) -> int:
